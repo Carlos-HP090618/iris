@@ -1,10 +1,12 @@
 #load libraries
 library(tidyverse)
 library(rstatix)
+library(tidymodels)
+library(vip)
 
 #load the dataset
 iris <- iris
-
+iris$Species <- as.factor(iris$Species)
 # Preparation for visualization and analysis
 normality_irir <- iris %>% 
   group_by(Species) %>% 
@@ -28,3 +30,37 @@ ggplot(iris_long, aes(x = Species, y = value, color = Species, fill = Species)) 
   labs(title = "Iris dataset summary", y = "Centimeters") + 
   theme_bw() + 
   theme(legend.position = "none")
+
+
+# Machine learning
+#split the data set
+iris_split <- initial_split(iris, strata = Species)
+iris_training <- training(iris_split)
+iris_testing <- testing(iris_split)
+
+# multinomial  regression
+multi_spec <- multinom_reg() %>%
+  set_engine("nnet") %>%
+  set_mode("classification")
+multi_model <- multi_spec %>%
+  fit(Species ~., data = iris_training)
+predictions <- predict(multi_model, new_data = iris_testing, type = "class") %>%
+  bind_cols(Species = iris_testing$Species)
+
+#performance
+custom_metrics <- metric_set(accuracy, sens, spec)
+multi_results <- custom_metrics(predictions, estimate = .pred_class, truth = Species)
+multi_results
+
+#Decision tree
+tree_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+tree_model <- tree_spec %>%
+  fit(Species ~., data = iris_training)
+predictions_tree <- predict(tree_model, new_data = iris_testing, type = "class") %>%
+  bind_cols(Species = iris_testing$Species)
+
+#tree performance
+tree_results <- custom_metrics(predictions_tree, estimate = .pred_class, truth = Species)
+tree_results
